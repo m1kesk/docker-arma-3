@@ -14,6 +14,7 @@ ENV STEAM_USER=$STEAM_USER
 ENV STEAM_PASS=$STEAM_PASS
 
 # install dependencies
+RUN dpkg --add-architecture i386
 RUN apt-get update
 RUN apt-get autoremove -y
 RUN apt-get clean -y
@@ -27,11 +28,15 @@ RUN echo $APP_ID > steam_appid.txt
 
 # install server
 RUN mkdir -p $INSTALL_DIR
-# RUN steamcmd +force_install_dir $INSTALL_DIR +login anonymous +app_update $APP_ID validate +quit
-RUN steamcmd +force_install_dir $INSTALL_DIR +login $STEAM_USER $STEAM_PASS +app_update $APP_ID validate +quit
+# RUN steamcmd +force_install_dir $INSTALL_DIR +login anonymous +app_update $APP_ID -beta public validate +quit
+RUN steamcmd +force_install_dir $INSTALL_DIR +login $STEAM_USER $STEAM_PASS +app_update $APP_ID -beta public validate +quit
 
 # set working directory
 WORKDIR $INSTALL_DIR
 
+# replace steamclient.so
+RUN rm ./steamclient.so
+RUN ln -s /root/.local/share/Steam/steamcmd/linux32/steamclient.so ./steamclient.so
+
 # set entrypoint
-ENTRYPOINT ["./arma3server_x64", "-profiles=/profiles"]
+ENTRYPOINT ["./arma3server_x64"]
