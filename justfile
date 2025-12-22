@@ -11,4 +11,4 @@ set dotenv-load := true
 
 # build docker image
 @build:
-    docker build . --no-cache --file ./dockerfile --tag docker-dont-starve-together:latest --build-arg STEAM_USER=${STEAM_USER} --build-arg STEAM_PASS=${STEAM_PASS}
+    docker build . --no-cache --file ./dockerfile --tag docker-arma-3:latest --build-arg STEAM_USER=${STEAM_USER} --build-arg STEAM_PASS=${STEAM_PASS}
