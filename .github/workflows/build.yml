@@ -15,17 +15,17 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@v6.0.1
 
-      - name: read version from build.txt
-        id: version
+      - name: get build_id from build.txt
+        id: get_build
         run: |
-          VERSION=$(cat build.txt | tr -d ' \n')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          BUILD=$(cat build.txt | tr -d ' \n')
+          echo "build_id=$BUILD" >> $GITHUB_OUTPUT
 
-      - name: check if version already exists
+      - name: check if release already exists
         id: check_release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.get_build.outputs.build_id }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists. Skipping build."
@@ -57,20 +57,27 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository }}:${{ steps.get_build.outputs.build_id }}
             ghcr.io/${{ github.repository }}:latest
-            docker.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+            docker.io/${{ github.repository }}:${{ steps.get_build.outputs.build_id }}
             docker.io/${{ github.repository }}:latest
-          build-args: |
-            STEAM_USER=${{ secrets.STEAM_USER }}
-            STEAM_PASS=${{ secrets.STEAM_PASS }}
+
+      - name: extract internal game version
+        if: steps.check_release.outputs.exists == 'false'
+        id: get_version
+        run: |
+          # Run the image we just pushed to extract the internal version file
+          IMAGE_NAME="ghcr.io/${{ github.repository }}:${{ steps.get_build.outputs.build_id }}"
+          GAME_VER=$(docker run --rm $IMAGE_NAME cat /home/steam/dst/game/version.txt | tr -d ' \n')
+          echo "version=$GAME_VER" >> $GITHUB_OUTPUT
 
       - name: create github release
         if: steps.check_release.outputs.exists == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.get_build.outputs.build_id }}
+          VERSION: ${{ steps.get_version.outputs.version }}
         run: |
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --notes "docker image pushed for build $TAG"
+          gh release create "$BUILD" \
+            --title "v$VERSION" \
+            --notes "Build ID: $BUILD | Internal Game Version: $VERSION"
