@@ -45,7 +45,7 @@ jobs:
         id: get_version
         run: |
           IMAGE="${{ github.repository }}:local"
-          VERSION=$(docker run --rm --entrypoint sh $IMAGE -c "strings /home/steam/arma3 | grep -oP 'Arma 3 Console version \K[0-9]+\.[0-9]+\.[0-9]+'")
+          VERSION=$(docker run --rm --entrypoint sh $IMAGE -c "strings /home/steam/arma3/arma3server | grep -oP 'Arma 3 Console version \K[0-9]+\.[0-9]+\.[0-9]+'")
           echo "version=v$VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
