@@ -16,6 +16,7 @@ ENV STEAM_PASS=$STEAM_PASS
 # install dependencies
 RUN dpkg --add-architecture i386
 RUN apt-get update
+RUN apt-get install -y binutils
 RUN apt-get autoremove -y
 RUN apt-get clean -y
 
