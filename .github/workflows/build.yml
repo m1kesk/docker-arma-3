@@ -58,6 +58,7 @@ jobs:
           fi
 
       - name: build image
+        if: steps.check_exists.outputs.exists == 'false'
         run: |
           IMAGE=${{ github.repository }}
           ls -la
