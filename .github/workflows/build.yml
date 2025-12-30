@@ -2,7 +2,25 @@ name: build
 
 on:
   workflow_call:
+    inputs:
+      branch:
+        description: branch to build
+        required: false
+        default: public
+        type: string
+
   workflow_dispatch:
+    inputs:
+      branch:
+        description: branch to build
+        required: false
+        type: choice
+        default: public
+        options:
+          - public
+          - contact
+          - profiling
+          - creatordlc
 
 jobs:
   build-and-push:
@@ -38,7 +56,11 @@ jobs:
         run: |
           IMAGE=${{ github.repository }}
           ls -la
-          docker build . --tag $IMAGE:local --build-arg STEAM_USER=${{ secrets.STEAM_USER }} --build-arg STEAM_PASS=${{ secrets.STEAM_PASS }}
+          docker build . \
+            --tag $IMAGE:local \
+            --build-arg STEAM_USER=${{ secrets.STEAM_USER }} \
+            --build-arg STEAM_PASS=${{ secrets.STEAM_PASS }} \
+            --build-arg BRANCH=${{ inputs.branch }}
 
       - name: extract game version
         if: steps.check_release.outputs.exists == 'false'
