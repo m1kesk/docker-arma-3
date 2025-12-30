@@ -1,0 +1,10 @@
+[
+    {
+        "branch": "public",
+        "build_id": 1234
+    },
+    {
+        "branch": "beta",
+        "build_id": 5678
+    }
+]
