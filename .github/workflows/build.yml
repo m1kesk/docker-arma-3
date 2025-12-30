@@ -112,13 +112,13 @@ jobs:
       - name: push image for public branch
         if: ${{ inputs.branch == 'public' && steps.check_exists.outputs.exists == 'false' }}
         run: |
-          docker push ${{ github.repository }}:local ghcr.io/${{ github.repository }}:latest
-          docker push ${{ github.repository }}:local docker.io/${{ github.repository }}:latest
-          docker push ${{ github.repository }}:local ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
-          docker push ${{ github.repository }}:local docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          docker push ghcr.io/${{ github.repository }}:latest
+          docker push docker.io/${{ github.repository }}:latest
+          docker push ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          docker push docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
 
       - name: push image for non-public branch
         if: ${{ inputs.branch != 'public' && steps.check_exists.outputs.exists == 'false' }}
         run: |
-          docker push ${{ github.repository }}:local ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
-          docker push ${{ github.repository }}:local docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          docker push ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          docker push docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
