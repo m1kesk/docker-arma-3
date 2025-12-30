@@ -17,8 +17,6 @@ ENV STEAM_PASS=$STEAM_PASS
 RUN dpkg --add-architecture i386
 RUN apt-get update
 RUN apt-get install -y binutils
-RUN apt-get autoremove -y
-RUN apt-get clean -y
 
 # set steam app
 RUN steamcmd +login anonymous +quit
@@ -30,7 +28,7 @@ RUN echo $APP_ID > steam_appid.txt
 # install server
 RUN mkdir -p $INSTALL_DIR
 # RUN steamcmd +force_install_dir $INSTALL_DIR +login anonymous +app_update $APP_ID -beta public validate +quit
-# RUN steamcmd +force_install_dir $INSTALL_DIR +login $STEAM_USER $STEAM_PASS +app_update $APP_ID -beta public validate +quit
+# RUN steamcmd +force_install_dir $INSTALL_DIR +login $STEAM_USER $STEAM_PASS +app_update $APP_ID -beta creatordlc validate +quit
 
 # set working directory
 WORKDIR $INSTALL_DIR

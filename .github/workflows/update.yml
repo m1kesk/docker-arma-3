@@ -24,20 +24,20 @@ jobs:
         run: |
           curl -s "https://api.steamcmd.net/v1/info/${{ vars.STEAM_APP_ID }}" > steam_info.json
           jq '
-            .data.branches
+            .data["'${{ vars.STEAM_APP_ID }}'"].branches
             | to_entries
             | map({
                 branch: .key,
                 build_id: .value.buildid
               })
-          ' steam_info.json > build.json
-          cat build.json
+          ' steam_info.json
 
       - name: fetch build id from steam api
         id: steam
         run: |
+          BRANCH="creatordlc"
           URL="https://api.steamcmd.net/v1/info/${{ vars.STEAM_APP_ID }}"
-          BUILD_ID=$(curl -s "$URL" | jq -r ".data[\"${{ vars.STEAM_APP_ID }}\"].depots.branches.public.buildid")
+          BUILD_ID=$(curl -s "$URL" | jq -r ".data[\"${{ vars.STEAM_APP_ID }}\"].depots.branches[$BRANCH].buildid")
           echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
 
       - name: read existing build.txt
