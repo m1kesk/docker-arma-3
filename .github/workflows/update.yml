@@ -26,7 +26,7 @@ jobs:
         run: |
           curl -s "https://api.steamcmd.net/v1/info/${{ vars.STEAM_APP_ID }}" > steam_info.json
           jq '
-            .data["'${{ vars.STEAM_APP_ID }}'"].branches
+            .data["'${{ vars.STEAM_APP_ID }}'"].branches // {}
             | to_entries
             | map({
                 branch: .key,
