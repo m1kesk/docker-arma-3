@@ -85,7 +85,7 @@ jobs:
           docker save $IMAGE -o $TAR_FILE
 
       - name: upload Docker image artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: docker-image-${{ inputs.branch }}-${{ github.run_id }}
           path: docker-image-${{ inputs.branch }}-${{ github.run_id }}.tar
@@ -106,7 +106,7 @@ jobs:
       pushed_build_id: ${{ steps.set_build_id.outputs.build_id }}
     steps:
       - name: download Docker image artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v7.0.0
         with:
           name: docker-image-${{ inputs.branch }}-${{ github.run_id }}
           path: .
