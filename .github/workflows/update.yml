@@ -39,7 +39,7 @@ jobs:
         run: |
           BRANCH="creatordlc"
           URL="https://api.steamcmd.net/v1/info/${{ vars.STEAM_APP_ID }}"
-          BUILD_ID=$(curl -s "$URL" | jq -r ".data[\"${{ vars.STEAM_APP_ID }}\"].depots.branches[$BRANCH].buildid")
+          BUILD_ID=$(curl -s "$URL" | jq -r ".data[\"${{ vars.STEAM_APP_ID }}\"].depots.branches.$BRANCH.buildid")
           echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
 
       - name: read existing build.txt

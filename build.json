@@ -1,10 +1,18 @@
 [
     {
-        "branch": "public",
-        "build_id": 1234
+        "branch": "contact",
+        "build_id": "18982089"
     },
     {
-        "branch": "beta",
-        "build_id": 5678
+        "branch": "creatordlc",
+        "build_id": "21192004"
+    },
+    {
+        "branch": "profiling",
+        "build_id": "21192525"
+    },
+    {
+        "branch": "public",
+        "build_id": "18981937"
     }
 ]
