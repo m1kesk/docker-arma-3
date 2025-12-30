@@ -33,23 +33,28 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@v6.0.1
 
-      - name: get build_id from build.txt
+      - name: get build_id from build.json
         id: get_build
         run: |
-          BUILD=$(cat build.txt | tr -d ' \n')
-          echo "build_id=$BUILD" >> $GITHUB_OUTPUT
+          BRANCH="${{ inputs.branch }}"
+          BUILD=$(jq -r ".[] | select(.branch == \"$BRANCH\") | .build_id" build.json)
 
-      - name: check if release already exists
-        id: check_release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.get_build.outputs.build_id }}
+          if [ -z "$BUILD" ] || [ "$BUILD" = "null" ]; then
+            echo "No build_id found for branch $BRANCH"
+            exit 1
+          fi
+          echo "build_id=$BUILD" >> "$GITHUB_OUTPUT"
+
+      - name: check if docker image exists
+        id: check_exists
         run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists. Skipping build."
-            echo "exists=true" >> $GITHUB_OUTPUT
+          IMAGE="ghcr.io/${{ github.repository }}:depot-${{ steps.get_build.outputs.build_id }}"
+          
+          if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+            echo "Image $IMAGE already exists. Skipping build."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: build image
@@ -63,7 +68,7 @@ jobs:
             --build-arg BRANCH=${{ inputs.branch }}
 
       - name: extract game version
-        if: steps.check_release.outputs.exists == 'false'
+        if: steps.check_exists.outputs.exists == 'false'
         id: get_version
         run: |
           IMAGE="${{ github.repository }}:local"
@@ -74,7 +79,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: log in to container registry [github]
-        if: steps.check_release.outputs.exists == 'false'
+        if: steps.check_exists.outputs.exists == 'false'
         uses: docker/login-action@v3.6.0
         with:
           registry: ghcr.io
@@ -82,44 +87,37 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: log in to container registry [docker]
-        if: steps.check_release.outputs.exists == 'false'
+        if: steps.check_exists.outputs.exists == 'false'
         uses: docker/login-action@v3.6.0
         with:
           registry: docker.io
           username: ${{ vars.DOCKER_USER }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: tag image
-        if: steps.check_release.outputs.exists == 'false'
+      - name: tag image for public branch
+        if: ${{ inputs.branch == 'public' && steps.check_exists.outputs.exists == 'false' }}
         run: |
-          docker tag ${{ github.repository }}:local ghcr.io/${{ github.repository }}:v${{ steps.get_version.outputs.version }}
-          docker tag ${{ github.repository }}:local ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version }}
-          docker tag ${{ github.repository }}:local ghcr.io/${{ github.repository }}:depot-${{ steps.get_build.outputs.build_id }}
           docker tag ${{ github.repository }}:local ghcr.io/${{ github.repository }}:latest
-          docker tag ${{ github.repository }}:local docker.io/${{ github.repository }}:v${{ steps.get_version.outputs.version }}
-          docker tag ${{ github.repository }}:local docker.io/${{ github.repository }}:${{ steps.get_version.outputs.version }}
-          docker tag ${{ github.repository }}:local docker.io/${{ github.repository }}:depot-${{ steps.get_build.outputs.build_id }}
           docker tag ${{ github.repository }}:local docker.io/${{ github.repository }}:latest
+          docker tag ${{ github.repository }}:local ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          docker tag ${{ github.repository }}:local docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
 
-      - name: push image
-        if: steps.check_release.outputs.exists == 'false'
+      - name: tag image for non-public branch
+        if: ${{ inputs.branch != 'public' && steps.check_exists.outputs.exists == 'false' }}
         run: |
-          docker push ghcr.io/${{ github.repository }}:v${{ steps.get_version.outputs.version }}
-          docker push ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version }}
-          docker push ghcr.io/${{ github.repository }}:depot-${{ steps.get_build.outputs.build_id }}
-          docker push ghcr.io/${{ github.repository }}:latest
-          docker push docker.io/${{ github.repository }}:v${{ steps.get_version.outputs.version }}
-          docker push docker.io/${{ github.repository }}:${{ steps.get_version.outputs.version }}
-          docker push docker.io/${{ github.repository }}:depot-${{ steps.get_build.outputs.build_id }}
-          docker push docker.io/${{ github.repository }}:latest
+          docker tag ${{ github.repository }}:local ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          docker tag ${{ github.repository }}:local docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
 
-      - name: create github release
-        if: steps.check_release.outputs.exists == 'false'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BUILD: ${{ steps.get_build.outputs.build_id }}
-          VERSION: ${{ steps.get_version.outputs.version }}
+      - name: push image for public branch
+        if: ${{ inputs.branch == 'public' && steps.check_exists.outputs.exists == 'false' }}
         run: |
-          gh release create "$BUILD" \
-            --title "v$VERSION" \
-            --notes "Build ID: $BUILD | Internal Game Version: $VERSION"
+          docker push ${{ github.repository }}:local ghcr.io/${{ github.repository }}:latest
+          docker push ${{ github.repository }}:local docker.io/${{ github.repository }}:latest
+          docker push ${{ github.repository }}:local ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          docker push ${{ github.repository }}:local docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+
+      - name: push image for non-public branch
+        if: ${{ inputs.branch != 'public' && steps.check_exists.outputs.exists == 'false' }}
+        run: |
+          docker push ${{ github.repository }}:local ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          docker push ${{ github.repository }}:local docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
