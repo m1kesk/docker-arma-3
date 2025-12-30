@@ -20,6 +20,8 @@ jobs:
       - name: checkout repository
         uses: actions/checkout@v6.0.1
 
+      - run: echo "STEAM_APP_ID=${{ vars.STEAM_APP_ID }}"
+
       - name: generate build.json from branches
         run: |
           curl -s "https://api.steamcmd.net/v1/info/${{ vars.STEAM_APP_ID }}" > steam_info.json
