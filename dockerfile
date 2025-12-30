@@ -28,7 +28,7 @@ RUN echo $APP_ID > steam_appid.txt
 # install server
 RUN mkdir -p $INSTALL_DIR
 # RUN steamcmd +force_install_dir $INSTALL_DIR +login anonymous +app_update $APP_ID -beta public validate +quit
-# RUN steamcmd +force_install_dir $INSTALL_DIR +login $STEAM_USER $STEAM_PASS +app_update $APP_ID -beta creatordlc validate +quit
+RUN steamcmd +force_install_dir $INSTALL_DIR +login $STEAM_USER $STEAM_PASS +app_update $APP_ID -beta creatordlc validate +quit
 
 # set working directory
 WORKDIR $INSTALL_DIR
