@@ -48,7 +48,7 @@ jobs:
       - name: check if docker image exists
         id: check_exists
         run: |
-          IMAGE="ghcr.io/${{ github.repository }}:depot-${{ steps.get_build.outputs.build_id }}"
+          IMAGE="ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}"
           
           if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
             echo "Image $IMAGE already exists. Skipping build."
