@@ -23,7 +23,7 @@ on:
           - creatordlc
 
 jobs:
-  prepare:
+  get-build:
     runs-on: ubuntu-latest
     outputs:
       build_id: ${{ steps.get_build.outputs.build_id }}
@@ -42,26 +42,25 @@ jobs:
           fi
           echo "build_id=$BUILD" >> "$GITHUB_OUTPUT"
 
-  check-image:
+  get-image:
     runs-on: ubuntu-latest
-    needs: prepare
+    needs: get-build
     outputs:
       exists: ${{ steps.check_exists.outputs.exists }}
     steps:
       - name: check if docker image exists
         id: check_exists
         run: |
-          IMAGE="ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ needs.prepare.outputs.build_id }}"
+          IMAGE="ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ needs.get-build.outputs.build_id }}"
           if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
-            echo "Image exists"
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
 
   build:
     runs-on: ubuntu-latest
-    needs: [prepare, check-image]
-    if: needs.check-image.outputs.exists == 'false'
+    needs: [get-build, get-image]
+    if: needs.get-image.outputs.exists == 'false'
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     steps:
@@ -78,16 +77,20 @@ jobs:
             --build-arg BRANCH=${{ inputs.branch }}
 
       - name: save Docker image to tar
-        run: docker save ${{ github.repository }}:local -o docker-image.tar
+        run: |
+          IMAGE=${{ github.repository }}:local
+          TAR_FILE=docker-image-${{ inputs.branch }}-${{ github.run_id }}.tar
+          docker save $IMAGE -o $TAR_FILE
 
       - name: upload Docker image artifact
         uses: actions/upload-artifact@v3
         with:
-          name: docker-image
-          path: docker-image.tar
+          name: docker-image-${{ inputs.branch }}-${{ github.run_id }}
+          path: docker-image-${{ inputs.branch }}-${{ github.run_id }}.tar
 
       - name: extract game version
         id: get_version
+        if: false
         run: |
           IMAGE="${{ github.repository }}:local"
           VERSION=$(docker run --rm $IMAGE --version 2>&1 | sed -n 's/.*ver\. \([0-9.]*\).*/\1/p')
@@ -96,16 +99,18 @@ jobs:
   push:
     runs-on: ubuntu-latest
     needs: build
-    if: needs.check-image.outputs.exists == 'false'
+    if: needs.get-image.outputs.exists == 'false'
+    outputs:
+      pushed_build_id: ${{ steps.set_build_id.outputs.build_id }}
     steps:
       - name: download Docker image artifact
         uses: actions/download-artifact@v3
         with:
-          name: docker-image
+          name: docker-image-${{ inputs.branch }}-${{ github.run_id }}
           path: .
 
       - name: load Docker image
-        run: docker load -i docker-image.tar
+        run: docker load -i docker-image-${{ inputs.branch }}-${{ github.run_id }}.tar
 
       - name: log in to container registry [github]
         uses: docker/login-action@v3.6.0
@@ -124,7 +129,7 @@ jobs:
       - name: tag image
         run: |
           IMAGE=${{ github.repository }}:local
-          BUILD_ID=${{ needs.prepare.outputs.build_id }}
+          BUILD_ID=${{ needs.get-build.outputs.build_id }}
           BRANCH=${{ inputs.branch }}
 
           if [ "$BRANCH" = "public" ]; then
@@ -138,7 +143,7 @@ jobs:
       - name: push image
         run: |
           BRANCH=${{ inputs.branch }}
-          BUILD_ID=${{ needs.prepare.outputs.build_id }}
+          BUILD_ID=${{ needs.get-build.outputs.build_id }}
 
           if [ "$BRANCH" = "public" ]; then
             docker push ghcr.io/${{ github.repository }}:latest
@@ -147,3 +152,34 @@ jobs:
 
           docker push ghcr.io/${{ github.repository }}:${BRANCH}-${BUILD_ID}
           docker push docker.io/${{ github.repository }}:${BRANCH}-${BUILD_ID}
+
+      - name: set build_id output
+        id: set_build_id
+        run: echo "build_id=${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+
+  set-build:
+    runs-on: ubuntu-latest
+    needs: push
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6.0.1
+
+      - name: update build.json
+        run: |
+          BRANCH="${{ inputs.branch }}"
+          NEW_BUILD="${{ needs.push.outputs.pushed_build_id }}"
+
+          if jq -e ".[] | select(.branch==\"$BRANCH\")" build.json > /dev/null; then
+            jq "map(if .branch==\"$BRANCH\" then .build_id=\"$NEW_BUILD\" else . end)" build.json > build_tmp.json
+          else
+            jq ". + [{\"branch\":\"$BRANCH\",\"build_id\":\"$NEW_BUILD\"}]" build.json > build_tmp.json
+          fi
+          mv build_tmp.json build.json
+
+      - name: commit updated build.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add build.json
+          git commit -m "Update build_id for branch ${{ inputs.branch }} to ${{ needs.push.outputs.pushed_build_id }}" || echo "No changes to commit"
+          git push
