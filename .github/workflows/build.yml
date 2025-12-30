@@ -104,7 +104,7 @@ jobs:
 
   push:
     runs-on: ubuntu-latest
-    needs: [build, get-build]
+    needs: build
     if: needs.get-image.outputs.exists == 'false'
     steps:
       - name: download Docker image artifact
@@ -114,8 +114,7 @@ jobs:
           path: .
 
       - name: load Docker image
-        run: |
-          docker load -i docker-image-${{ inputs.branch }}-${{ needs.get-build.outputs.build_id }}.tar
+        run: docker load -i docker-image-${{ inputs.branch }}-${{ needs.get-build.outputs.build_id }}.tar
 
       - name: log in to container registry [github]
         uses: docker/login-action@v3.6.0
@@ -160,7 +159,7 @@ jobs:
 
   set-build:
     runs-on: ubuntu-latest
-    needs: get-build
+    needs: push
     steps:
       - name: checkout repository
         uses: actions/checkout@v6.0.1
@@ -190,5 +189,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add build.json
-          git commit -m "Update build_id for branch ${{ inputs.branch }} to ${{ needs.get-build.outputs.build_id }}" || echo "No changes to commit"
+          git commit -m "Sync build_id for branch ${{ inputs.branch }} to ${{ needs.get-build.outputs.build_id }}" || echo "No changes to commit"
           git push
