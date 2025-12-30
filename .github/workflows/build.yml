@@ -77,12 +77,14 @@ jobs:
             --build-arg STEAM_PASS=${{ secrets.STEAM_PASS }} \
             --build-arg BRANCH=${{ inputs.branch }}
 
-      - name: save Docker image as artifact
+      - name: save Docker image to tar
+        run: docker save ${{ github.repository }}:local -o docker-image.tar
+
+      - name: upload Docker image artifact
         uses: actions/upload-artifact@v3
         with:
           name: docker-image
           path: docker-image.tar
-        run: docker save ${{ github.repository }}:local -o docker-image.tar
 
       - name: extract game version
         id: get_version
