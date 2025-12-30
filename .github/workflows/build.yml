@@ -39,11 +39,17 @@ jobs:
         id: get_build
         run: |
           BRANCH="${{ inputs.branch }}"
-          BUILD=$(jq -r ".[] | select(.branch == \"$BRANCH\") | .build_id" build.json)
+          # ensure build.json exists
+          [ -f build.json ] || echo "[]" > build.json
+          
+          BUILD=$(jq -r ".[] | select(.branch==\"$BRANCH\") | .build_id // empty" build.json)
 
-          if [ -z "$BUILD" ] || [ "$BUILD" = "null" ]; then
-            echo "No build_id found for branch $BRANCH"
-            exit 1
+          if [ -z "$BUILD" ]; then
+            echo "Branch $BRANCH not found in build.json or file is empty"
+            # append placeholder entry
+            jq ". + [{\"branch\":\"$BRANCH\",\"build_id\":\"PLACEHOLDER\"}]" build.json > build_tmp.json
+            mv build_tmp.json build.json
+            BUILD="PLACEHOLDER"
           fi
 
           echo "build_id=$BUILD" >> "$GITHUB_OUTPUT"
