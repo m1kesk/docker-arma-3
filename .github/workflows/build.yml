@@ -23,12 +23,10 @@ on:
           - creatordlc
 
 jobs:
-  build-and-push:
+  prepare:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-
+    outputs:
+      build_id: ${{ steps.get_build.outputs.build_id }}
     steps:
       - name: checkout repository
         uses: actions/checkout@v6.0.1
@@ -45,23 +43,36 @@ jobs:
           fi
           echo "build_id=$BUILD" >> "$GITHUB_OUTPUT"
 
+  check-image:
+    runs-on: ubuntu-latest
+    needs: prepare
+    outputs:
+      exists: ${{ steps.check_exists.outputs.exists }}
+    steps:
       - name: check if docker image exists
         id: check_exists
         run: |
-          IMAGE="ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}"
-          
+          IMAGE="ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ needs.prepare.outputs.build_id }}"
           if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
-            echo "Image $IMAGE already exists. Skipping build."
+            echo "Image exists"
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: build image
-        if: steps.check_exists.outputs.exists == 'false'
+  build:
+    runs-on: ubuntu-latest
+    needs: [prepare, check-image]
+    if: needs.check-image.outputs.exists == 'false'
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6.0.1
+
+      - name: build Docker image
         run: |
           IMAGE=${{ github.repository }}
-          ls -la
           docker build . \
             --tag $IMAGE:local \
             --build-arg STEAM_USER=${{ secrets.STEAM_USER }} \
@@ -69,18 +80,18 @@ jobs:
             --build-arg BRANCH=${{ inputs.branch }}
 
       - name: extract game version
-        if: steps.check_exists.outputs.exists == 'false'
         id: get_version
         run: |
           IMAGE="${{ github.repository }}:local"
-          # VERSION=$(docker run --rm --entrypoint sh $IMAGE -c "strings /home/steam/arma3/arma3server | grep -oP 'Arma 3 Console version \K[0-9]+\.[0-9]+\.[0-9]+'")
-          # VERSION=$(docker run --rm --entrypoint sh $IMAGE -c "/home/steam/arma3/arma3server --version 2>&1 | sed -n 's/.*ver\. \([0-9.]*\).*/\1/p'")
           VERSION=$(docker run --rm $IMAGE --version 2>&1 | sed -n 's/.*ver\. \([0-9.]*\).*/\1/p')
-          echo "version=v$VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+  push:
+    runs-on: ubuntu-latest
+    needs: build
+    if: needs.check-image.outputs.exists == 'false'
+    steps:
       - name: log in to container registry [github]
-        if: steps.check_exists.outputs.exists == 'false'
         uses: docker/login-action@v3.6.0
         with:
           registry: ghcr.io
@@ -88,37 +99,35 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: log in to container registry [docker]
-        if: steps.check_exists.outputs.exists == 'false'
         uses: docker/login-action@v3.6.0
         with:
           registry: docker.io
           username: ${{ vars.DOCKER_USER }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: tag image for public branch
-        if: ${{ inputs.branch == 'public' && steps.check_exists.outputs.exists == 'false' }}
+      - name: tag image
         run: |
-          docker tag ${{ github.repository }}:local ghcr.io/${{ github.repository }}:latest
-          docker tag ${{ github.repository }}:local docker.io/${{ github.repository }}:latest
-          docker tag ${{ github.repository }}:local ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
-          docker tag ${{ github.repository }}:local docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          IMAGE=${{ github.repository }}:local
+          BUILD_ID=${{ needs.prepare.outputs.build_id }}
+          BRANCH=${{ inputs.branch }}
 
-      - name: tag image for non-public branch
-        if: ${{ inputs.branch != 'public' && steps.check_exists.outputs.exists == 'false' }}
-        run: |
-          docker tag ${{ github.repository }}:local ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
-          docker tag ${{ github.repository }}:local docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          if [ "$BRANCH" = "public" ]; then
+            docker tag $IMAGE ghcr.io/${{ github.repository }}:latest
+            docker tag $IMAGE docker.io/${{ github.repository }}:latest
+          fi
 
-      - name: push image for public branch
-        if: ${{ inputs.branch == 'public' && steps.check_exists.outputs.exists == 'false' }}
-        run: |
-          docker push ghcr.io/${{ github.repository }}:latest
-          docker push docker.io/${{ github.repository }}:latest
-          docker push ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
-          docker push docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          docker tag $IMAGE ghcr.io/${{ github.repository }}:${BRANCH}-${BUILD_ID}
+          docker tag $IMAGE docker.io/${{ github.repository }}:${BRANCH}-${BUILD_ID}
 
-      - name: push image for non-public branch
-        if: ${{ inputs.branch != 'public' && steps.check_exists.outputs.exists == 'false' }}
+      - name: push image
         run: |
-          docker push ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
-          docker push docker.io/${{ github.repository }}:${{ inputs.branch }}-${{ steps.get_build.outputs.build_id }}
+          BRANCH=${{ inputs.branch }}
+          BUILD_ID=${{ needs.prepare.outputs.build_id }}
+
+          if [ "$BRANCH" = "public" ]; then
+            docker push ghcr.io/${{ github.repository }}:latest
+            docker push docker.io/${{ github.repository }}:latest
+          fi
+
+          docker push ghcr.io/${{ github.repository }}:${BRANCH}-${BUILD_ID}
+          docker push docker.io/${{ github.repository }}:${BRANCH}-${BUILD_ID}
