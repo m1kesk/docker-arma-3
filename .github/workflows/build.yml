@@ -173,7 +173,7 @@ jobs:
       - name: update build.json
         run: |
           BRANCH="${{ inputs.branch }}"
-          NEW_BUILD="${{ needs.push.outputs.pushed_build_id }}"
+          NEW_BUILD="${{ needs.get-build.outputs.build_id }}"
 
           if jq -e ".[] | select(.branch==\"$BRANCH\")" build.json > /dev/null; then
             jq "map(if .branch==\"$BRANCH\" then .build_id=\"$NEW_BUILD\" else . end)" build.json > build_tmp.json
@@ -187,5 +187,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add build.json
-          git commit -m "Update build_id for branch ${{ inputs.branch }} to ${{ needs.push.outputs.pushed_build_id }}" || echo "No changes to commit"
+          git commit -m "Update build_id for branch ${{ inputs.branch }} to ${{ needs.push.outputs.build_id }}" || echo "No changes to commit"
           git push
