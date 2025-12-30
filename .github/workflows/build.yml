@@ -52,10 +52,12 @@ jobs:
         id: check_exists
         run: |
           IMAGE="ghcr.io/${{ github.repository }}:${{ inputs.branch }}-${{ needs.get-build.outputs.build_id }}"
-          if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+
+          if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
   build:
     runs-on: ubuntu-latest
