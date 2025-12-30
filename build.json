@@ -1,18 +1,18 @@
 [
-    {
-        "branch": "contact",
-        "build_id": "18982089"
-    },
-    {
-        "branch": "creatordlc",
-        "build_id": "21192004"
-    },
-    {
-        "branch": "profiling",
-        "build_id": "21192525"
-    },
-    {
-        "branch": "public",
-        "build_id": "18981937"
-    }
+  {
+    "branch": "contact",
+    "build_id": "18982089"
+  },
+  {
+    "branch": "creatordlc",
+    "build_id": "21192004"
+  },
+  {
+    "branch": "profiling",
+    "build_id": "21192525"
+  },
+  {
+    "branch": "public",
+    "build_id": "20598574461"
+  }
 ]
